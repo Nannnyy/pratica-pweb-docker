@@ -1,7 +1,5 @@
-version: '3.8'
-
+# docker-compose.yml (corrigido)
 services:
-  # Banco de dados PostgreSQL
   db-pweb:
     image: postgres:15-alpine
     container_name: db-pweb
@@ -16,13 +14,29 @@ services:
     networks:
       - todo-pweb-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
 
-  # Backend API
+  redis-pweb:
+    image: redis:7-alpine
+    container_name: redis-pweb              
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} 
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_pweb_data:/data 
+    networks:
+      - todo-pweb-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   backend-pweb:
     build:
       context: ./backend
@@ -36,22 +50,25 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: todolist
+      REDIS_HOST: redis-pweb
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     ports:
       - "3000:3000"
     depends_on:
       db-pweb:
         condition: service_healthy
+      redis-pweb:
+        condition: service_healthy
     networks:
       - todo-pweb-network
     restart: unless-stopped
 
-  # Frontend (Build e serve com Nginx)
   frontend-pweb:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=http://localhost:3000
+        VITE_API_BASE_URL: http://localhost:3000
     container_name: frontend-pweb
     ports:
       - "80:80"
@@ -67,3 +84,4 @@ networks:
 
 volumes:
   postgres_pweb_data:
+  redis_pweb_data:        
