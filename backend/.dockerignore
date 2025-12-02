@@ -3,7 +3,7 @@ npm-debug.log
 .git
 .gitignore
 README.md
-.env
+# .env removido para permitir uso no Docker
 .nyc_output
 coverage
 .DS_Store

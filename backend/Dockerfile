@@ -16,8 +16,8 @@ RUN npm ci
 # Copia o código fonte da aplicação
 COPY . .
 
-# Torna o script executável
-RUN chmod +x start.sh
+# Converte terminações de linha do start.sh para Unix e torna executável
+RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
 
 # Expõe a porta que a aplicação usa
 EXPOSE 3000
@@ -26,6 +26,9 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Sobrescreve o entrypoint padrão para executar diretamente o script
+ENTRYPOINT []
+
 # Comando para iniciar a aplicação (executa migrations e inicia servidor)
-CMD ["./start.sh"]
+CMD ["/bin/bash", "./start.sh"]
 

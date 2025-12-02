@@ -3,7 +3,7 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Argumento de build para URL da API
+# Argumento de build para URL da API (pode ser sobrescrito)
 ARG VITE_API_BASE_URL=http://localhost:3000
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
@@ -13,8 +13,12 @@ COPY package*.json ./
 # Instala as dependências
 RUN npm ci
 
-# Copia o código fonte
+# Copia o código fonte (incluindo .env se existir)
+# O Vite automaticamente carrega variáveis de .env durante o build
 COPY . .
+
+# Se .env existir, ele será usado pelo Vite automaticamente
+# Caso contrário, a variável ARG/ENV acima será usada
 
 # Build da aplicação
 RUN npm run build
