@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,8 +20,10 @@ type LoginFormData = z.infer<typeof loginSchema>;
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string })?.from || '/';
 
   const {
     register,
@@ -31,12 +33,18 @@ const Login = () => {
     resolver: zodResolver(loginSchema),
   });
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, from, navigate]);
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
       const success = await login(data.email, data.password);
       if (success) {
-        navigate('/');
+        navigate(from, { replace: true });
       }
     } catch (error) {
       console.error('Erro no login:', error);
@@ -102,11 +110,7 @@ const Login = () => {
                 )}
               </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -115,6 +119,12 @@ const Login = () => {
                 ) : (
                   'Entrar'
                 )}
+              </Button>
+
+              <Button variant="outline" className="w-full" type="button" asChild>
+                <Link to="/register" className="w-full text-center">
+                  Registre-se
+                </Link>
               </Button>
             </form>
           </CardContent>

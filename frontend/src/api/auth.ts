@@ -7,7 +7,15 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface LoginResponse {
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+  photo?: string;
+}
+
+export interface AuthResponse {
+  user: User;
   accessToken: string;
   refreshToken: string;
 }
@@ -16,7 +24,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  photo?: string;
+  photo?: string | null;
 }
 
 export interface ProfileUpdateRequest {
@@ -25,31 +33,49 @@ export interface ProfileUpdateRequest {
   photo?: string;
 }
 
-export const login = async (email: string, password: string): Promise<LoginResponse | null> => {
-  const loadingToastId = showLoading("Fazendo login...");
+const handleAuthRequest = async (
+  endpoint: string,
+  payload: Record<string, unknown>,
+  loadingMessage: string,
+  successMessage: string
+): Promise<AuthResponse | null> => {
+  const loadingToastId = showLoading(loadingMessage);
   try {
-    const response = await fetch(`${API_BASE_URL}/signin`, {
+    const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(payload),
     });
 
-    if (response.ok) {
-      const data: LoginResponse = await response.json();
-      dismissToast(loadingToastId);
-      showSuccess("Login realizado com sucesso!");
-      return data;
-    } else {
-      throw new Error("Credenciais inválidas");
+    if (!response.ok) {
+      throw new Error("Falha na autenticação");
     }
+
+    const data: AuthResponse = await response.json();
+    dismissToast(loadingToastId);
+    showSuccess(successMessage);
+    return data;
   } catch (error) {
     dismissToast(loadingToastId);
-    showError("Erro ao fazer login. Verifique suas credenciais.");
-    console.error("Erro no login:", error);
+    showError("Erro ao processar a requisição. Verifique os dados e tente novamente.");
+    console.error(`[Auth] ${endpoint} error:`, error);
     return null;
   }
+};
+
+export const login = async (email: string, password: string): Promise<AuthResponse | null> => {
+  return handleAuthRequest(
+    "signin",
+    { email, password },
+    "Fazendo login...",
+    "Login realizado com sucesso!"
+  );
+};
+
+export const register = async (payload: RegisterRequest): Promise<AuthResponse | null> => {
+  return handleAuthRequest("signup", payload, "Criando conta...", "Conta criada com sucesso!");
 };
 
 export const getProfile = async (accessToken: string): Promise<User | null> => {
@@ -57,7 +83,7 @@ export const getProfile = async (accessToken: string): Promise<User | null> => {
     const response = await fetch(`${API_BASE_URL}/profile`, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
     });
@@ -81,9 +107,9 @@ export const updateProfile = async (
   const loadingToastId = showLoading("Atualizando perfil...");
   try {
     const response = await fetch(`${API_BASE_URL}/profile`, {
-      method: "PUT",
+      method: "PATCH",
       headers: {
-        "Authorization": `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(profileData),

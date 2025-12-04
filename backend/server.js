@@ -183,6 +183,21 @@ app.post("/signin", async (req, res) => {
   }
 });
 
+app.patch('/profile', authenticate, async (req, res) => {
+  try {
+    const { name, email, photo } = req.body;
+    const user = await User.findByPk(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+    await user.update({ name, email, photoUrl: photo ?? null });
+    return res.json(toUserResponse(user));
+  } catch (error) {
+    console.error("Erro ao atualizar perfil:", error);
+    return res.status(500).json({ error: "Erro ao atualizar perfil" });
+  }
+});
+
 app.get("/profile", authenticate, async (req, res) => {
   try {
     const user = await User.findByPk(req.userId);

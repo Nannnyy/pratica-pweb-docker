@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateProfile, getProfile } from '@/api/auth';
+import { updateProfile } from '@/api/auth';
 import { Loader2, User, Edit3, Save, X } from 'lucide-react';
 
 const profileSchema = z.object({
@@ -22,7 +22,8 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { user, tokens, updateUser } = useAuth();
+  const [isFetchingProfile, setIsFetchingProfile] = useState(true);
+  const { user, tokens, updateUser, refreshProfile } = useAuth();
 
   const {
     register,
@@ -38,6 +39,19 @@ const Profile = () => {
     },
   });
 
+  const fetchProfileFromApi = useCallback(async () => {
+    if (!tokens?.accessToken) {
+      setIsFetchingProfile(false);
+      return;
+    }
+    await refreshProfile();
+    setIsFetchingProfile(false);
+  }, [tokens?.accessToken, refreshProfile]);
+
+  useEffect(() => {
+    fetchProfileFromApi();
+  }, [fetchProfileFromApi]);
+
   useEffect(() => {
     if (user) {
       reset({
@@ -49,20 +63,21 @@ const Profile = () => {
   }, [user, reset]);
 
   const onSubmit = async (data: ProfileFormData) => {
+    if (!tokens?.accessToken || !isEditing) {
+      return;
+    }
     setIsLoading(true);
     try {
-      // TEMPORÁRIO: Mockar atualização para teste
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular delay
-      
-      const updatedUser = {
-        id: user?.id || '1',
+      const updatedUser = await updateProfile(tokens.accessToken, {
         name: data.name,
         email: data.email,
-        photo: data.photo || ''
-      };
-      
-      updateUser(updatedUser);
-      setIsEditing(false);
+        photo: data.photo || undefined,
+      });
+
+      if (updatedUser) {
+        updateUser(updatedUser);
+        setIsEditing(false);
+      }
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
     } finally {
@@ -87,6 +102,25 @@ const Profile = () => {
       .toUpperCase()
       .slice(0, 2);
   };
+
+  if (isFetchingProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Carregando perfil...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-600">Não foi possível carregar as informações do usuário.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -162,7 +196,10 @@ const Profile = () => {
                 {!isEditing ? (
                   <Button
                     type="button"
-                    onClick={() => setIsEditing(true)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setIsEditing(true);
+                    }}
                     className="flex items-center space-x-2"
                   >
                     <Edit3 className="h-4 w-4" />
