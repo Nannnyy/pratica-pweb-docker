@@ -5,10 +5,14 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import bd from "./src/models/index.js";
 import redis from "./src/redis/index.js";
+import supabase from "./src/supabase/index.js";
+import multer from "multer";
 
 dotenv.config();
 
+
 const { Task, User } = bd;
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Testa a conexão com o banco de dados
 try {
@@ -208,6 +212,28 @@ app.get("/profile", authenticate, async (req, res) => {
   } catch (error) {
     console.error("Erro ao carregar profile:", error);
     return res.status(500).json({ error: "Erro ao carregar perfil" });
+  }
+});
+app.post("/profile/photo", authenticate, upload.single("file"), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "Arquivo não enviado" });
+    const userId = req.userId;
+    const bucket = "profile-photos";
+    const ext = file.originalname.split('.').pop();
+    const filePath = `${userId}/${Date.now()}.${ext}`;
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+    if (error) return res.status(500).json({ error: error.message });
+    const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    res.json({ url: publicUrlData.publicUrl });
+  } catch (err) {
+    console.error("Erro ao fazer upload da foto de perfil:", err);
+    res.status(500).json({ error: "Erro ao fazer upload da foto" });
   }
 });
 

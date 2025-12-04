@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateProfile } from '@/api/auth';
+import { uploadProfilePhoto } from '@/api/uploadPhoto';
 import { Loader2, User, Edit3, Save, X } from 'lucide-react';
 
 const profileSchema = z.object({
@@ -23,6 +24,8 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingProfile, setIsFetchingProfile] = useState(true);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const { user, tokens, updateUser, refreshProfile } = useAuth();
 
   const {
@@ -68,15 +71,24 @@ const Profile = () => {
     }
     setIsLoading(true);
     try {
+      let photoUrl = data.photo || undefined;
+      if (photoFile) {
+        setPhotoUploading(true);
+        const uploadedUrl = await uploadProfilePhoto(tokens.accessToken, photoFile);
+        setPhotoUploading(false);
+        if (uploadedUrl) {
+          photoUrl = uploadedUrl;
+        }
+      }
       const updatedUser = await updateProfile(tokens.accessToken, {
         name: data.name,
         email: data.email,
-        photo: data.photo || undefined,
+        photo: photoUrl,
       });
-
       if (updatedUser) {
         updateUser(updatedUser);
         setIsEditing(false);
+        setPhotoFile(null);
       }
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
@@ -188,6 +200,27 @@ const Profile = () => {
                 />
                 {errors.photo && (
                   <p className="text-sm text-red-500">{errors.photo.message}</p>
+                )}
+                {isEditing && (
+                  <div className="mt-2">
+                    <Label htmlFor="photo-upload">Upload de nova foto</Label>
+                    <Input
+                      id="photo-upload"
+                      type="file"
+                      accept="image/*"
+                      disabled={photoUploading || isLoading}
+                      onChange={e => {
+                        if (e.target.files && e.target.files[0]) {
+                          setPhotoFile(e.target.files[0]);
+                        } else {
+                          setPhotoFile(null);
+                        }
+                      }}
+                    />
+                    {photoUploading && (
+                      <p className="text-sm text-blue-500">Enviando foto...</p>
+                    )}
+                  </div>
                 )}
               </div>
 
